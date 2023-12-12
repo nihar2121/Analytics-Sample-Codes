@@ -1,0 +1,78 @@
+
+CREATE OR REPLACE
+ALGORITHM = UNDEFINED VIEW `vw_airline_flight_actual_budget_test` AS
+
+-- Actuals part
+SELECT
+    `actuals`.`airport_iata_code` AS `Airport Iata Code`,
+    `actuals`.`flight_date` AS `Flight Date`,
+    `actuals`.`airline` AS `Airline`,
+    `actuals`.`flight_category` AS `Flight Category`,
+    `actuals`.`route` AS `Route`,
+    `actuals`.`total_seats` AS `Seats`,
+    `actuals`.`total_transfer` AS `Transfer`,
+    `actuals`.`total_transit` AS `Transit`,
+    `actuals`.`total_passengers` AS `Passengers`,
+    `actuals`.`total_movements` AS `Movements`,
+    `actuals`.`flight_type` AS `Flight Type`,
+    `actuals`.`scenario` AS `Scenario`,
+    `actuals`.`version` AS `Version`,
+    `actuals`.`is_final` AS `Is Final`,
+    `actuals`.`direction` AS `Direction`,
+    0 AS `Seats Budget`,
+    0 AS `Passengers Budget`,
+    0 AS `Movements Budget`,
+    `airline`.`flight_code` AS `Flight Code`,
+    `airport`.`fy_start_month` AS `Fy Start Month`,
+    `airport`.`contract_level` AS `Contract Level`,
+    MAX(`pub`.`latest_data_date`) AS `Latest Data Date`,
+    `airport_route`.`airport_name` AS `Airport IATA as Route`,
+    'Actuals' AS `Source`
+FROM
+    (((((`vw_airline_flight_actual_mth2` `actuals`
+LEFT JOIN `airline` ON (`airline`.`airline` = `actuals`.`airline`))
+LEFT JOIN `airport` ON (`airport`.`iata_code` = `actuals`.`airport_iata_code`))
+LEFT JOIN `airport` `airport_route` ON (`airport_route`.`iata_code` = `actuals`.`route`))
+LEFT JOIN `publish_status` `pub` ON (`pub`.`airport_iata_code` = `actuals`.`airport_iata_code`))
+
+UNION
+
+-- Budget part (OUTBOUND)
+SELECT
+    `budget`.`airport_iata_code` AS `Airport Iata Code`,
+    `budget`.`flight_date` AS `Flight Date`,
+    ...
+    'Budget' AS `Source`,
+    MAX(`pub`.`latest_data_date`) AS `Latest Data Date`
+FROM
+    (((((`airline_flight_budget_mth` `budget`
+LEFT JOIN `airline` ON (`airline`.`airline` = `budget`.`airline`))
+LEFT JOIN `airport` ON (`airport`.`iata_code` = `budget`.`airport_iata_code`))
+LEFT JOIN `airport` `airport_route` ON (`airport_route`.`iata_code` = `budget`.`route`))
+LEFT JOIN `publish_status` `pub` ON (`pub`.`airport_iata_code` = `budget`.`airport_iata_code`))
+GROUP BY
+    `budget`.`airport_iata_code`,
+    `budget`.`flight_date`,
+    `budget`.`airline`,
+    ...
+
+UNION
+
+-- Budget part (INBOUND)
+SELECT
+    `budget`.`airport_iata_code` AS `Airport Iata Code`,
+    `budget`.`flight_date` AS `Flight Date`,
+    ...
+    'Budget' AS `Source`,
+    MAX(`pub`.`latest_data_date`) AS `Latest Data Date`
+FROM
+    (((((`airline_flight_budget_mth` `budget`
+LEFT JOIN `airline` ON (`airline`.`airline` = `budget`.`airline`))
+LEFT JOIN `airport` ON (`airport`.`iata_code` = `budget`.`airport_iata_code`))
+LEFT JOIN `airport` `airport_route` ON (`airport_route`.`iata_code` = `budget`.`route`))
+LEFT JOIN `publish_status` `pub` ON (`pub`.`airport_iata_code` = `budget`.`airport_iata_code`))
+GROUP BY
+    `budget`.`airport_iata_code`,
+    `budget`.`flight_date`,
+    `budget`.`airline`,
+    ...

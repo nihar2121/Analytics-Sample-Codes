@@ -1,0 +1,147 @@
+-- This script creates a table 't_base_customers1' to identify and group duplicate customer records
+-- based on certain attributes like email, phone, driver's license number, and name/address.
+-- It uses a series of CTEs (Common Table Expressions) to progressively filter and group these records,
+-- assigning a match score to each group based on specific criteria. The final table includes only unique
+-- combinations of group_id and customer_id with their respective match scores.
+
+CREATE TABLE t_tbl_customers1 AS
+-- grouped_customers: Identifies potential duplicates by comparing customer attributes (email, phone, etc.)
+-- and assigns a unique group ID to each set of duplicates.
+
+WITH grouped_customers AS (
+    SELECT DISTINCT t1.customer_id,t1.nameaddress, t1.primary_name, t1.middle_name, t1.family_name, t1.phone_work, t1.phone_mobile, t1.phone_home, t1.phone_other, t1.phone, t1.email_home, t1.email_other, t1.email, t1.dob, t1.dlnumber, t1.street_address1, t1.street_address2, t1.locality, t1.state, t1.postal_code, t1.address, t1.customer_name, t1.sub_total,
+           DENSE_RANK() OVER (ORDER BY t1.email, t1.phone, t1.dlnumber, t1.nameaddress) AS group_id
+    FROM tbl_customers t1
+    -- Self-joining to find matching records based on specified criteria.
+   JOIN tbl_customers t2
+    ON t1.customer_id != t2.customer_id
+    AND (t1.phone = t2.phone OR t1.email = t2.email OR t1.dlnumber = t2.dlnumber or t1.nameaddress = t2.nameaddress)
+),
+-- matched_customers: Filters the grouped customers to include only those groups with more than one member,
+-- indicating potential duplicate records.
+
+matched_customers AS (
+    SELECT gc.customer_id,gc.nameaddress, gc.primary_name, gc.middle_name, gc.family_name, gc.phone_work, gc.phone_mobile, gc.phone_home, gc.phone_other, gc.phone, gc.email_home, gc.email_other, gc.email, gc.dob, gc.dlnumber, gc.street_address1, gc.street_address2, gc.locality, gc.state, gc.postal_code, gc.address, gc.customer_name, gc.sub_total, gc.group_id
+    FROM grouped_customers gc
+    WHERE gc.group_id IN (
+        SELECT group_id
+        FROM grouped_customers
+        GROUP BY group_id
+        HAVING COUNT(*) > 1
+    )
+),
+-- matched_customers_with_type: Adds a 'match_type' column to categorize the nature of the match
+-- (e.g., by email, phone, etc.).
+
+matched_customers1 AS (
+    SELECT 
+        mc.customer_id, mc.primary_name, mc.middle_name, mc.family_name, mc.phone_work, mc.phone_mobile, mc.phone_home, mc.phone_other, mc.phone, mc.email_home, mc.email_other, mc.email, mc.dob, mc.dlnumber, mc.street_address1, mc.street_address2, mc.locality, mc.state, mc.postal_code, mc.address, mc.customer_name, fg.group_id, mc.sub_total,
+            CASE 
+	        WHEN mc.email IS NOT NULL and COUNT(*) OVER (PARTITION BY fg.group_id, mc.email) > 1 THEN  'Email'
+            WHEN mc.phone IS NOT NULL and COUNT(*) OVER (PARTITION BY fg.group_id, mc.phone) > 1 THEN  'Phone'
+            WHEN mc.dlnumber IS NOT null and COUNT(*) OVER (PARTITION BY fg.group_id, mc.dlnumber) > 1 THEN 'DLNumber'
+            WHEN mc.nameaddress IS NOT null and COUNT(*) OVER (PARTITION BY fg.group_id, mc.nameaddress) > 1 THEN 'Name And Address'
+        END AS match_type
+        FROM 
+        matched_customers mc
+        JOIN matched_customers fg ON mc.group_id = fg.group_id
+WHERE 
+ mc.group_id IN (
+  SELECT group_id
+  FROM matched_customers
+  GROUP BY group_id
+  HAVING COUNT(*) > 1)),
+-- Resultsfinal: Calculates a 'match_score' for each record based on the match type and other criteria.
+-- Higher scores indicate stronger matches.
+
+Resultsfinal as (
+	SELECT 
+    mc1.customer_id, 
+    mc1.primary_name, 
+    mc1.middle_name, 
+    mc1.family_name, 
+    mc1.phone_work, 
+    mc1.phone_mobile, 
+    mc1.phone_home, 
+    mc1.phone_other, 
+    mc1.phone, 
+    mc1.email_home, 
+    mc1.email_other, 
+    mc1.email, 
+    mc1.dob, 
+    mc1.dlnumber, 
+    mc1.street_address1, 
+    mc1.street_address2, 
+    mc1.locality, 
+    mc1.state, 
+    mc1.postal_code, 
+    mc1.address, 
+    mc1.customer_name, 
+    mc1.group_id, 
+    mc1.sub_total,
+    mc1.match_type,
+   CASE             --  ( CASE conditions for calculating match scores)
+	    WHEN mc1.match_type IN ('DLNumber', 'Name And Address') 
+        THEN 30
+        WHEN  mc1.group_id = mc3.group_id and
+        	mc1.match_type IN ('Phone', 'Email') 
+            AND DATEDIFF(day, mc1.dob::date, mc3.dob::date) BETWEEN -2 AND 2
+            Or SOUNDEX(mc1.customer_name) = SOUNDEX(mc3.customer_name)
+            THEN 30
+        WHEN  mc1.group_id = mc3.group_id 
+         	AND mc1.match_type IN ('Phone', 'Email')
+         	AND DATEDIFF(day, mc1.dob::date, mc3.dob::date) NOT BETWEEN -2 AND 2
+            or SOUNDEX(mc1.customer_name) != SOUNDEX(mc3.customer_name) 
+            THEN -30
+        ELSE NULL
+    END AS match_score
+FROM matched_customers1 mc1
+inner JOIN (
+    SELECT group_id, customer_name, dob, customer_id,match_type
+    FROM matched_customers1
+    GROUP BY group_id, customer_name, dob, customer_id,match_type
+) mc3 ON mc1.group_id = mc3.group_id 
+       AND mc1.customer_id != mc3.customer_id
+       WHERE mc1.group_id IN (
+    select group_id 
+    FROM matched_customers1)
+),
+-- giving row_number funciton in order to keep only first instance of the combination of group_id and customer_id
+-- this is for those groups which have more than 2 customer_ids
+finalcte as (
+select mc1.*,  ROW_NUMBER() OVER (PARTITION BY mc1.group_id || mc1.customer_id ORDER BY mc1.group_id, mc1.customer_id,mc1.match_score) as rn
+from Resultsfinal mc1
+order by group_id
+)
+-- Selecting the final set of columns for the output table.
+-- Filtering to include only the top-ranked record for each customer in a group.
+
+ 	SELECT 
+    mc1.customer_id, 
+    mc1.primary_name, 
+    mc1.middle_name, 
+    mc1.family_name, 
+    mc1.phone_work, 
+    mc1.phone_mobile, 
+    mc1.phone_home, 
+    mc1.phone_other, 
+    mc1.phone, 
+    mc1.email_home, 
+    mc1.email_other, 
+    mc1.email, 
+    mc1.dob, 
+    mc1.dlnumber, 
+    mc1.street_address1, 
+    mc1.street_address2, 
+    mc1.locality, 
+    mc1.state, 
+    mc1.postal_code, 
+    mc1.address, 
+    mc1.customer_name, 
+    mc1.group_id, 
+    mc1.sub_total,
+    mc1.match_type,
+    mc1.match_score
+    from finalcte mc1
+where rn = 1
+order by group_id;

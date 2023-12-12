@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[28]:
+
+
+import pandas as pd
+
+
+# In[29]:
+
+
+import pandas as pd
+df = pd.read_csv(r'C:\Users\Desktop\jlr\Required columns21.csv')
+df['key'] = df['Mat Code'].astype(str) + ';;' + df['Vendor Code'].astype(str)
+
+
+# In[30]:
+
+
+df2 = df.drop_duplicates(subset = 'key', keep = False)
+
+
+# In[31]:
+
+
+df3 = df2[df2.duplicated('Mat Code', keep = False)]
+
+
+# In[32]:
+
+
+df4 = df3.sort_values('Mat Code')
+
+
+# In[33]:
+
+
+df5 = df4.dropna(subset = 'Mat Code')
+
+
+# In[34]:
+
+
+dnm = df5.groupby('Mat Code').agg({'Unit Rate': ['max','min']})
+dnm = dnm['Unit Rate']
+dnm.to_csv(r'Downloads/junk.csv')
+dnm = pd.read_csv(r'Downloads/junk.csv')
+
+
+# In[35]:
+
+
+df5['max'] = df5['Mat Code'].map(dnm.set_index('Mat Code')['max'])
+df5['min'] = df5['Mat Code'].map(dnm.set_index('Mat Code')['min'])
+
+
+# In[36]:
+
+
+def percentage_change(col1,col2):
+    return ((col2 - col1) / col1) * 100
+#giving the new column the name of percentage
+df5['Percentage Diff'] = percentage_change(df5['min'],df5['max'])
+
+
+# In[38]:
+
+
+df6 = df5[df5['Percentage Diff'] > 25]
+
+
+# In[40]:
+
+
+df6.to_csv(r'C:\Users\Desktop\JLR\Observations\op5-same mat diff vendor diff price great than 25.csv')
+
+
+# In[ ]:
+
+
+
+

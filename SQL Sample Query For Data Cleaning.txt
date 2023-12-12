@@ -1,0 +1,75 @@
+-- 1. Remove all special characters from all columns
+UPDATE tbl_customers
+SET 
+	cust_name = REGEXP_REPLACE(cust_name, '[^a-zA-Z0-9]', ''),
+    driving_license_no = REGEXP_REPLACE(driving_license_no, '[^a-zA-Z0-9]', ''),
+    cust_address = regexp_REPLACE(cust_address, '[^a-zA-Z0-9]', ''),
+    cust_locality = REGEXP_REPLACE(cust_locality, '[^a-zA-Z0-9]', ''),
+    cust_state = REGEXP_REPLACE(cust_state, '[^a-zA-Z0-9]', ''),
+    cust_postal_code = REGEXP_REPLACE(cust_postal_code, '[^a-zA-Z0-9]', '');
+
+-- 2. Make all text in the columns lowercase
+UPDATE tbl_customers
+SET cust_id = LOWER(cust_id),
+    cust_name = LOWER(cust_name),
+    work_phone = work_phone, -- no change
+    mobile_phone = mobile_phone, -- no change
+    home_phone = home_phone, -- no change
+    other_phone = other_phone, -- no change
+    cust_phone = cust_phone, -- no change
+    home_email = LOWER(home_email),
+    other_email = LOWER(other_email),
+    birth_date = birth_date, -- no change
+    driving_license_no = LOWER(driving_license_no),
+    cust_address = LOWER(cust_address),
+    cust_locality = LOWER(cust_locality),
+    cust_state = LOWER(cust_state),
+    cust_postal_code = LOWER(cust_postal_code);
+
+-- 3. Remove all white spaces from all columns
+UPDATE tbl_customers
+   SET work_phone = REPLACE(work_phone, ' ', ''),
+    mobile_phone = REPLACE(mobile_phone, ' ', ''),
+    home_phone = REPLACE(home_phone, ' ', ''),
+    other_phone = REPLACE(other_phone, ' ', ''),
+    cust_phone = REPLACE(cust_phone, ' ', ''),
+    home_email = REPLACE(home_email, ' ', ''),
+    other_email = REPLACE(other_email, ' ', ''),
+    birth_date = birth_date, -- no change
+    driving_license_no = REPLACE(driving_license_no, ' ', ''),
+    cust_address = REPLACE(cust_address, ' ', ''),
+    cust_postal_code = REPLACE(cust_postal_code, ' ', '');
+
+-- 4. Standardizing the date format to 'YYYY-MM-DD'
+UPDATE tbl_customers
+SET birth_date = TO_CHAR(TO_DATE(birth_date, 'Current-Format'), 'YYYY-MM-DD')
+WHERE birth_date IS NOT NULL AND birth_date != '';
+
+-- 5. Trimming leading and trailing spaces from all string columns
+UPDATE tbl_customers
+SET 
+    cust_name = TRIM(cust_name),
+    driving_license_no = TRIM(driving_license_no),
+    cust_address = TRIM(cust_address),
+    cust_locality = TRIM(cust_locality),
+    cust_state = TRIM(cust_state),
+    cust_postal_code = TRIM(cust_postal_code),
+    home_email = TRIM(home_email),
+    other_email = TRIM(other_email);
+-- 6. Replacing null values in certain text fields with a placeholder 'N/A' or a default value
+UPDATE tbl_customers
+SET 
+    cust_name = COALESCE(cust_name, 'N/A'),
+    driving_license_no = COALESCE(driving_license_no, 'N/A'),
+    home_email = COALESCE(home_email, 'no_email_provided'),
+    other_email = COALESCE(other_email, 'no_email_provided'),
+    cust_address = COALESCE(cust_address, 'No Address Provided');
+
+--7. Converting names and addresses to title case for standardization
+UPDATE tbl_customers
+SET 
+    cust_name = INITCAP(cust_name),
+    cust_address = INITCAP(cust_address),
+    cust_locality = INITCAP(cust_locality),
+    cust_state = INITCAP(cust_state);
+

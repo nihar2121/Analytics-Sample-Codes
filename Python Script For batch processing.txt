@@ -1,0 +1,37 @@
+import pandas as pd
+
+# Function to process each batch
+def process_batch(dataframe, column_name):
+    mean_value = dataframe[column_name].mean()
+    median_value = dataframe[column_name].median()
+    std_dev = dataframe[column_name].std()
+    return mean_value, median_value, std_dev
+
+# Main function to handle batch processing
+def batch_processing(file_path, chunk_size, column_name):
+    batch_statistics = {'mean': [], 'median': [], 'std_dev': []}
+
+    try:
+        # Read the CSV file in chunks
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+            mean, median, std_dev = process_batch(chunk, column_name)
+            batch_statistics['mean'].append(mean)
+            batch_statistics['median'].append(median)
+            batch_statistics['std_dev'].append(std_dev)
+
+        # Aggregate the results
+        overall_stats = {stat: sum(values) / len(values) for stat, values in batch_statistics.items()}
+        return overall_stats
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+# Example usage
+file_path = 'rebelfoods.csv'  chunk_size = 1000  # Define the size of each batch
+column_name = 'totalrevenue'
+
+result = batch_processing(file_path, chunk_size, column_name)
+if result:
+    print(f"Aggregated Statistics: {result}")
+else:
+    print("Failed to process the data.")
